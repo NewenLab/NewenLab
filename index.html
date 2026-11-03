@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NewenLab | Science Rewards</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#eaf9f7;color:#252047}
+header{background:linear-gradient(120deg,#6633a5,#16aaa7);padding:24px;color:white;text-align:center}
+header h1{font-size:36px;margin:4px}
+header p{margin:6px}
+nav{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;padding:15px;background:#d8f4f0}
+button,select,input{font:inherit;padding:11px;border-radius:10px;border:1px solid #a5a0bd}
+button{background:#f9d74e;color:#252047;font-weight:bold;cursor:pointer}
+button:hover{background:#f1c625}
+nav button{background:white}
+main{max-width:950px;margin:auto;padding:18px}
+section{display:none;background:white;border-radius:18px;padding:20px;margin-bottom:18px;box-shadow:0 3px 12px #0001}
+section.active{display:block}
+h2{color:#563092}
+input,select{max-width:100%;margin:5px}
+.card{background:#f1eafa;border-radius:12px;padding:14px;margin:10px 0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.small{font-size:13px;color:#595471}
+.badge{background:#d5f7ed;padding:6px 10px;border-radius:20px}
+#presentation{position:fixed;inset:0;background:#25154d;color:white;display:none;z-index:20;text-align:center;padding:35px}
+#presentation h1{font-size:clamp(30px,7vw,70px)}
+#presentation .points{font-size:clamp(65px,18vw,170px);color:#f9d74e;font-weight:bold}
+#presentation button{margin-top:25px}
+</style>
+</head>
+<body>
+<header>
+<h1>🐱⚡ NewenLab 🔬🐱</h1>
+<p>Tu energía transforma. Tus acciones suman.</p>
+<p>🧪 Awka y Omara te dan la bienvenida al laboratorio</p>
+</header>
+
+<nav>
+<button onclick="show('home')">🏠 Inicio</button>
+<button onclick="show('students')">🎓 Estudiantes</button>
+<button onclick="show('points')">⭐ Dar puntos</button>
+<button onclick="show('auction')">🔨 Subasta</button>
+<button onclick="show('history')">📜 Historial</button>
+</nav>
+
+<main>
+<section id="home" class="active">
+<h2>⚡ Bienvenida a NewenLab</h2>
+<p>Registra estudiantes, reconoce sus acciones y administra sus puntos científicos.</p>
+<p><strong>Semestre actual:</strong> <span id="semesterLabel"></span></p>
+<p id="summary"></p>
+<button onclick="newSemester()">📅 Comenzar otro semestre</button>
+<p class="small">Esta demostración guarda datos solamente en este navegador.</p>
+</section>
+
+<section id="students">
+<h2>🎓 Comunidad NewenLab</h2>
+<div class="row">
+<input id="studentName" placeholder="Nombre del estudiante">
+<select id="studentGrade">
+<option value="6">6.º grado</option>
+<option value="7">7.º grado</option>
+<option value="8">8.º grado</option>
+</select>
+<button onclick="addStudent()">➕ Agregar estudiante</button>
+</div>
+<h3>Buscar estudiantes</h3>
+<div class="row">
+<select id="gradeFilter" onchange="render()">
+<option value="all">Todos los grados</option>
+<option value="6">6.º</option>
+<option value="7">7.º</option>
+<option value="8">8.º</option>
+</select>
+<input id="search" placeholder="Buscar por nombre" oninput="render()">
+</div>
+<div id="studentList"></div>
+</section>
+
+<section id="points">
+<h2>⭐ Reconocer acciones</h2>
+<div class="row">
+<select id="pointStudent"></select>
+<select id="category">
+<option>Participación</option>
+<option>Responsabilidad</option>
+<option>Trabajo en clases</option>
+<option>Amabilidad</option>
+<option>Compañerismo</option>
+<option>Concentración</option>
+<option>Curiosidad científica</option>
+<option>Pensamiento crítico</option>
+<option>Perseverancia</option>
+<option>Trabajo científico</option>
+<option>Superación personal</option>
+</select>
+<select id="amount">
+<option value="1">+1 punto</option>
+<option value="2">+2 puntos</option>
+<option value="3">+3 puntos</option>
+</select>
+<button onclick="award()">⚡ Entregar puntos</button>
+</div>
+<p id="pointMessage"></p>
+</section>
+
+<section id="auction">
+<h2>🔨 Subasta científica</h2>
+<p>Registra solamente al ganador y su oferta final. Los demás estudiantes conservan sus puntos.</p>
+<div class="row">
+<select id="auctionStudent"></select>
+<input id="prize" placeholder="Premio sorpresa">
+<input id="bid" type="number" min="1" placeholder="Oferta ganadora">
+<button onclick="auction()">🏆 Registrar ganador</button>
+</div>
+<p id="auctionMessage"></p>
+</section>
+
+<section id="history">
+<h2>📜 Historial de movimientos</h2>
+<div id="historyList"></div>
+</section>
+</main>
+
+<div id="presentation">
+<h1 id="presentName"></h1>
+<p>⚡ Puntos disponibles ⚡</p>
+<div class="points" id="presentPoints"></div>
+<button onclick="closePresentation()">✖ Cerrar presentación</button>
+</div>
+
+<script>
+const KEY="newenlab_demo_v1";
+let db;
+try{
+db=JSON.parse(localStorage.getItem(KEY))||null;
+}catch(e){db=null}
+if(!db)db={semester:1,students:[],transactions:[]};
+
+function save(){
+localStorage.setItem(KEY,JSON.stringify(db));
+render();
+}
+function show(id){
+document.querySelectorAll("main section").forEach(s=>s.classList.remove("active"));
+document.getElementById(id).classList.add("active");
+render();
+}
+function addStudent(){
+const name=document.getElementById("studentName").value.trim();
+const grade=document.getElementById("studentGrade").value;
+if(!name){alert("Escribe un nombre.");return}
+db.students.push({
+id:Date.now()+"-"+Math.random().toString(36).slice(2),
+name:name,grade:grade
+});
+document.getElementById("studentName").value="";
+save();
+}
+function balance(id){
+return db.transactions.filter(t=>t.studentId===id&&t.semester===db.semester)
+.reduce((sum,t)=>sum+t.delta,0);
+}
+function earned(id){
+return db.transactions.filter(t=>t.studentId===id&&t.semester===db.semester&&t.delta>0)
+.reduce((sum,t)=>sum+t.delta,0);
+}
+function spent(id){
+return -db.transactions.filter(t=>t.studentId===id&&t.semester===db.semester&&t.delta<0)
+.reduce((sum,t)=>sum+t.delta,0);
+}
+function award(){
+const id=document.getElementById("pointStudent").value;
+if(!id){alert("Primero agrega un estudiante.");return}
+const amount=Number(document.getElementById("amount").value);
+const category=document.getElementById("category").value;
+db.transactions.unshift({
+studentId:id,semester:db.semester,delta:amount,
+reason:category,date:new Date().toLocaleString("es")
+});
+document.getElementById("pointMessage").textContent="¡Puntos entregados!";
+save();
+}
+function auction(){
+const id=document.getElementById("auctionStudent").value;
+const bid=Number(document.getElementById("bid").value);
+const prize=document.getElementById("prize").value.trim();
+if(!id||!prize||!Number.isInteger(bid)||bid<1){
+alert("Completa el ganador, premio y oferta.");return
+}
+if(balance(id)<bid){alert("El estudiante no tiene suficientes puntos.");return}
+db.transactions.unshift({
+studentId:id,semester:db.semester,delta:-bid,
+reason:"Subasta: "+prize,date:new Date().toLocaleString("es")
+});
+document.getElementById("auctionMessage").textContent="¡Subasta registrada!";
+document.getElementById("prize").value="";
+document.getElementById("bid").value="";
+save();
+}
+function present(id){
+const student=db.students.find(s=>s.id===id);
+if(!student)return;
+document.getElementById("presentName").textContent=student.name;
+document.getElementById("presentPoints").textContent=balance(id);
+document.getElementById("presentation").style.display="block";
+}
+function closePresentation(){
+document.getElementById("presentation").style.display="none";
+}
+function newSemester(){
+if(!confirm("¿Comenzar un semestre nuevo? Se conservará el historial anterior, pero los saldos del nuevo semestre comenzarán en cero."))return;
+db.semester++;
+save();
+}
+function render(){
+document.getElementById("semesterLabel").textContent=db.semester;
+document.getElementById("summary").textContent=
+"Estudiantes: "+db.students.length+" | Puntos entregados: "+
+db.students.reduce((sum,s)=>sum+earned(s.id),0);
+
+const filter=document.getElementById("gradeFilter").value;
+const search=document.getElementById("search").value.toLowerCase();
+const list=document.getElementById("studentList");
+list.innerHTML="";
+db.students.filter(s=>(filter==="all"||s.grade===filter)&&s.name.toLowerCase().includes(search))
+.forEach(s=>{
+const card=document.createElement("div");
+card.className="card";
+const title=document.createElement("strong");
+title.textContent=s.name+" — "+s.grade+".º grado";
+const info=document.createElement("p");
+info.textContent="Ganados: "+earned(s.id)+" | Gastados: "+spent(s.id)+" | Disponibles: "+balance(s.id);
+const btn=document.createElement("button");
+btn.textContent="📺 Presentar puntos";
+btn.onclick=()=>present(s.id);
+card.append(title,info,btn);
+list.appendChild(card);
+});
+if(!list.children.length)list.textContent="No hay estudiantes para mostrar.";
+
+["pointStudent","auctionStudent"].forEach(selectId=>{
+const el=document.getElementById(selectId);
+const old=el.value;
+el.innerHTML="";
+db.students.forEach(s=>{
+const opt=document.createElement("option");
+opt.value=s.id;
+opt.textContent=s.name+" ("+s.grade+".º)";
+el.appendChild(opt);
+});
+if(db.students.some(s=>s.id===old))el.value=old;
+});
+const history=document.getElementById("historyList");
+history.innerHTML="";
+db.transactions.forEach(t=>{
+const student=db.students.find(s=>s.id===t.studentId);
+const item=document.createElement("div");
+item.className="card";
+item.textContent=(student?student.name:"Estudiante eliminado")+
+" | "+(t.delta>0?"+":"")+t.delta+
+" | "+t.reason+" | Semestre "+t.semester+" | "+t.date;
+history.appendChild(item);
+});
+if(!db.transactions.length)history.textContent="Todavía no hay movimientos.";
+}
+render();
+</script>
+</body>
+</html>
